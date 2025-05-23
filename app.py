@@ -19,7 +19,7 @@ with st.sidebar:
 
 # Main area
 st.subheader(f"Forecast: {selected_lane}")
-lane_data, charts = load_model_results(selected_lane)
+lane_data, charts_data = load_model_results(selected_lane)
 
 # Display key metrics
 st.metric("Total Loads", lane_data["total_loads"])
@@ -30,9 +30,21 @@ st.metric("EST %", f"{lane_data['est_pct']:.2f}%")
 # Forecast table
 st.markdown("### Forecast Table")
 # Transposed the dataframe to put the period vertically rather than horizontally
-st.dataframe(flip_forecast_table(lane_data["forecast_table"]))
+st.dataframe(lane_data["forecast_table"], hide_index=True)
 
 # Forecast plot
 st.markdown("### Forecast Trends")
-fig = px.line(charts, x="period", y="rate", color="type", markers=True, title="Rate Forecast Over Time")
+fig = px.bar(
+    charts_data,
+    x="Period",
+    y="Delta (€/km)",
+    color="Type",
+    barmode="group",
+    title="Forecast Error by Period and Type (Predicted - Actual €/km)",
+    text="Delta (€/km)"
+)
+
+# Optional: Add horizontal reference line at 0
+fig.add_hline(y=0, line_dash="dot", line_color="gray")
+
 st.plotly_chart(fig, use_container_width=True)
