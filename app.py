@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from data_loader import load_lane_data, load_model_results, flip_forecast_table
-from model import get_forecast_data
+from data_loader import load_lane_data, load_model_results
 
 st.set_page_config(layout="wide")
 st.title("📊 Carrier Cost Forecast Dashboard")
