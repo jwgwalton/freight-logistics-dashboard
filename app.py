@@ -4,6 +4,10 @@ import plotly.express as px
 from data_loader import load_lane_data, load_model_results
 
 st.set_page_config(layout="wide")
+
+# Needs to be imported after set_page_config as it sets a cache on the ML model
+from model import get_forecast_data
+
 st.title("📊 Carrier Cost Forecast Dashboard")
 
 # Sidebar filters

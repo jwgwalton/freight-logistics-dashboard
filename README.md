@@ -46,4 +46,13 @@ source .venv/bin/activate
 python streamlit run app.py
 ```
 
-# Roadmap
+# Potential design
+
+- Filter button grabs relevant data 
+  - Based off source & destination postcodes
+
+- Generate predictions using back tests
+
+# Trim down packages in uv
+
+I've added the packages for training a model to the deployment which aren't needed
