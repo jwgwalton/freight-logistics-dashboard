@@ -25,7 +25,7 @@ def generate_route():
     destination_lat = round(np.random.uniform(45.0, 60.0), 6)
     destination_lon = round(np.random.uniform(-5.0, 15.0), 6)
     route_distance_km = round(np.random.uniform(50, 1500), 1)
-    cost = route_distance_km * round(np.random.uniform(0.05, 1.0), 2)
+    cost = (route_distance_km * 1.5) + np.random.uniform(0.0, 10.0)
     return {
         "origin_country_code": origin_country,
         "destination_country_code": destination_country,
@@ -45,19 +45,17 @@ def generate_route():
 
 # Generate data
 data = []
-start_date = datetime(2023, 1, 1)
 
 for _ in range(num_rows):
-    pickup_start = start_date + timedelta(days=np.random.randint(0, 730), hours=np.random.randint(0, 24))
-    carrier_locked_offset = np.random.randint(-10, 10)
-    diff_days = carrier_locked_offset
+    start_date = fake.date_between(start_date='-3y', end_date='-1m')
 
     row = {
-        "pickup_start_at_month": pickup_start.month,
-        "pickup_start_at_week": pickup_start.isocalendar()[1],
-        "pickup_start_at_day": pickup_start.day,
-        "pickup_start_at_hour": pickup_start.hour,
-        "diff_days_carrier_locked_at_pickup_start_at": diff_days,
+        "pickup_date": start_date,
+        # "pickup_start_at_month": pickup_start.month,
+        # "pickup_start_at_week": pickup_start.isocalendar()[1],
+        # "pickup_start_at_day": pickup_start.day,
+        # "pickup_start_at_hour": pickup_start.hour,
+        # "diff_days_carrier_locked_at_pickup_start_at": diff_days,
         "contract_type": random.choice(["spot", "tender"]),
         "vehicle_type": random.choice(["van", "truck", "mega", "refrigerated"]),
         "multistop_count": random.randint(0, 3),

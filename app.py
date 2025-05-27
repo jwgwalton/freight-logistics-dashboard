@@ -1,40 +1,91 @@
-# streamlit_app.py
-import streamlit as st
+from datetime import datetime, timedelta
 import pandas as pd
+import plotly.express as px
+import streamlit as st
+
 from data_loader import DataLoader
-from utils import build_filters_from_widgets
 
-# --- Load external data source ---
-st.set_page_config(page_title="Logistics ML Dashboard", layout="wide")
-st.title("📦 Logistics Forecast Dashboard")
+# --- Streamlit Setup ---
+st.set_page_config(page_title="Logistics Pricing Dashboard", layout="wide")
+st.title("📦 Logistics Pricing Dashboard")
 
-# Initialize loader (use CSV for now, swap with SQL later)
+# --- Initialize Data Loader ---
 loader = DataLoader(source="csv", path="data/fake_data.csv")
 
-# Cache unique filter values
-# Note: The underscore before the loader parameter is a convention to indicate that Steamlit should not hash the argument
+# --- Load and Cache Full Dataset ---
 @st.cache_data
-def get_filter_options(_loader):
-    return {
-        "origin_area_name": _loader.get_unique_values("origin_area_name"),
-        "vehicle_type": _loader.get_unique_values("vehicle_type"),
-        "destination_area_name": _loader.get_unique_values("destination_area_name"),
-    }
+def load_full_data():
+    return loader.load_data()
 
-filter_options = get_filter_options(loader)
+full_data = load_full_data()
 
+# --- Progressive Filtering ---
+df = full_data.copy()
 
-# --- Sidebar Filters ---
-filters = build_filters_from_widgets(filter_options)
+df["pickup_prefix"] = df["origin_location_code"].astype(str).str[:3]
+df["delivery_prefix"] = df["destination_location_code"].astype(str).str[:3]
+df["pickup_date"] = pd.to_datetime(df["pickup_date"], errors="coerce")
 
-# --- Load and Filter Data ---
-st.subheader("Filtered Shipping Data")
-data = loader.filter_data(filters)
-st.write(data)
+# Filter 1: Carrier Type
+carrier_types = df["vehicle_type"].dropna().unique()
+selected_carrier = st.sidebar.selectbox("Carrier Type", ["All"] + sorted(carrier_types))
+if selected_carrier != "All":
+    df = df[df["vehicle_type"] == selected_carrier]
 
-# --- Visualization Example: Price vs Weight ---
-if not data.empty:
+# Filter 2: Delivery Country (depends on selected carrier)
+delivery_options = df["delivery_prefix"].dropna().unique()
+selected_country = st.sidebar.selectbox("Delivery Postcode", ["All"] + sorted(delivery_options))
+if selected_country != "All":
+    df = df[df["delivery_prefix"] == selected_country]
+
+# Filter 3: Pickup Postcode (depends on previous)
+pickup_options = df["pickup_prefix"].dropna().unique()
+selected_pickup = st.sidebar.selectbox("Pickup Postcode", ["All"] + sorted(pickup_options))
+if selected_pickup != "All":
+    df = df[df["pickup_prefix"] == selected_pickup]
+
+# # Filter 4: Weight Range
+if not df.empty:
+    min_weight, max_weight = int(df["weight_kg"].min()), int(df["weight_kg"].max())
+    weight_range = st.sidebar.slider("Weight Range (kg)", min_value=min_weight, max_value=max_weight, value=(min_weight, max_weight))
+    df = df[(df["weight_kg"] >= weight_range[0]) & (df["weight_kg"] <= weight_range[1])]
+
+# --- Display Filtered Data ---
+if not df.empty:
+    # --- Summary Table for Last 3 and 12 Months ---
+    if len(df) > 1:
+        st.subheader("Price Summary for Last 3 and 12 Months")
+        now = datetime.now()
+        last_3m = df[df["pickup_date"] >= now - timedelta(days=90)]
+        last_12m = df[df["pickup_date"] >= now - timedelta(days=365)]
+
+        def summary_stats(data, label):
+            return pd.DataFrame({
+                f"{label}": [
+                    data["cost"].mean(),
+                    data["cost"].median(),
+                    data["cost"].min(),
+                    data["cost"].max()
+                ]
+            }, index=["Mean", "Median", "Min", "Max"])
+
+        summary_3m = summary_stats(last_3m, "Last 3 Months")
+        summary_12m = summary_stats(last_12m, "Last 12 Months")
+        summary_table = pd.concat([summary_3m, summary_12m], axis=1)
+        st.dataframe(summary_table.style.format("{:.2f}"))
+
+    # --- Visualizations ---
     st.subheader("Shipping costs")
-    st.scatter_chart(data=data, x="pickup_start_at_month", y="cost")
+    df["route"] = df["pickup_prefix"] + " → " + df["delivery_prefix"]
+    fig = px.scatter(
+        df,
+        x="pickup_date",
+        y="cost",
+        color="vehicle_type",
+        hover_data=["route", "cost"],
+    )
+    st.plotly_chart(fig, use_container_width=True)
 else:
     st.warning("No data matches the selected filters.")
+
+

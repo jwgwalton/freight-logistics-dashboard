@@ -6,6 +6,18 @@ class DataLoader:
         self.path = path
         self.connection = connection
 
+
+    def load_data(self):
+        if self.source == "csv":
+            return pd.read_csv(self.path)
+        elif self.source == "sql":
+            if self.connection is None:
+                raise ValueError("Database connection is required for SQL source")
+            query = "SELECT * FROM shipping_data"
+            return pd.read_sql(query, self.connection)
+        else:
+            raise ValueError("Unsupported data source")
+
     def get_unique_values(self, column):
         if self.source == "csv":
             df = pd.read_csv(self.path, usecols=[column])
