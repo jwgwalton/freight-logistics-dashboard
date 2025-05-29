@@ -27,22 +27,22 @@ def generate_route():
     route_distance_km = round(np.random.uniform(50, 1500), 1)
     cost = (route_distance_km * 1.5) + np.random.uniform(0.0, 10.0)
     return {
-        "origin_country_code": origin_country,
-        "destination_country_code": destination_country,
-        "is_domestic_load": int(is_domestic),
-        "origin_latitude": origin_lat,
-        "origin_longitude": origin_lon,
-        "destination_latitude": destination_lat,
-        "destination_longitude": destination_lon,
-        "origin_area_name": fake.city(),
-        "destination_area_name": fake.city(),
-        "origin_location_code": fake.postcode(),
+        "backend_origin_country_code": origin_country,
+        "backend_destination_country_code": destination_country,
+        "backend_is_domestic_load": int(is_domestic),
+        "backend_origin_latitude": origin_lat,
+        "backend_origin_longitude": origin_lon,
+        "backend_destination_latitude": destination_lat,
+        "backend_destination_longitude": destination_lon,
+        "backend_origin_area_name": fake.city(),
+        "backend_destination_area_name": fake.city(),
+        "backend_origin_location_code": fake.postcode(),
         #"origin_prefix": fake.postcode()[:3],
-        "destination_location_code": fake.postcode(),
+        "backend_destination_location_code": fake.postcode(),
         # "destination_prefix": fake.postcode()[:3],
-        "route_distance_km": route_distance_km,
-        "weight_kg": round(np.random.uniform(0, 1000), 1),
-        "cost": cost
+        "backend_route_distance_km": route_distance_km,
+        "backend_weight_kg": round(np.random.uniform(0, 1000), 1),
+        "backend_cost": cost
     }
 
 # Generate data
@@ -52,16 +52,16 @@ for _ in range(num_rows):
     start_date = fake.date_between(start_date='-3y', end_date='-1m')
 
     row = {
-        "pickup_date": start_date,
+        "backend_pickup_date": start_date,
         # "pickup_start_at_month": pickup_start.month,
         # "pickup_start_at_week": pickup_start.isocalendar()[1],
         # "pickup_start_at_day": pickup_start.day,
         # "pickup_start_at_hour": pickup_start.hour,
         # "diff_days_carrier_locked_at_pickup_start_at": diff_days,
-        "contract_type": random.choice(["spot", "tender"]),
-        "vehicle_type": random.choice(["van", "truck", "mega", "refrigerated"]),
-        "multistop_count": random.randint(0, 3),
-        "is_roundtrip": random.choice([0, 1])
+        "backend_contract_type": random.choice(["spot", "tender"]),
+        "backend_vehicle_type": random.choice(["van", "truck", "mega", "refrigerated"]),
+        "backend_multistop_count": random.randint(0, 3),
+        "backend_is_roundtrip": random.choice([0, 1])
     }
     row.update(generate_route())
     data.append(row)

@@ -138,8 +138,8 @@ with st.form("lookup_form"):
 
         filters = {
             "vehicle_type": input_vehicle,
-            # These are the actual column names in the data
-            "origin_location_code": f"{input_origin}%",  # match prefix
+            # We want to match the full postcode against the prefix
+            "origin_location_code": f"{input_origin}%",
             "destination_location_code": f"{input_dest}%",
             #"pickup_date": (three_months_ago.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d")),
             "weight_kg": (input_weight * (1-percentage_variance_for_weight), input_weight * (1+percentage_variance_for_weight)),  # ±10% weight range
