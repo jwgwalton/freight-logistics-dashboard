@@ -37,7 +37,9 @@ def generate_route():
         "origin_area_name": fake.city(),
         "destination_area_name": fake.city(),
         "origin_location_code": fake.postcode(),
+        #"origin_prefix": fake.postcode()[:3],
         "destination_location_code": fake.postcode(),
+        # "destination_prefix": fake.postcode()[:3],
         "route_distance_km": route_distance_km,
         "weight_kg": round(np.random.uniform(0, 1000), 1),
         "cost": cost

@@ -7,5 +7,6 @@ requires-python = ">=3.11"
 dependencies = [
     "faker>=37.3.0",
     "plotly>=6.1.1",
+    "polars>=1.30.0",
     "streamlit>=1.45.1",
 ]
