@@ -29,17 +29,18 @@ selected_carrier = st.sidebar.selectbox("Carrier Type", ["All"] + carrier_option
 if selected_carrier != "All":
     filters["vehicle_type"] = selected_carrier
 
-# Step 2: Delivery Postcode prefix (dependent on carrier type)
+# Step 2: Pickup Postcode prefix (dependent on carrier type)
+pickup_options = loader.get_unique_prefixes("origin_location_code", filters)
+selected_pickup = st.sidebar.selectbox("Pickup Postcode", ["All"] + pickup_options)
+if selected_pickup != "All":
+    filters["origin_location_code"] = selected_pickup  + "%" # Match the prefix in the whole postcode
+
+# Step 3: Delivery Postcode prefix (dependent on above filters)
 delivery_options = loader.get_unique_prefixes("destination_location_code", filters)
 selected_delivery = st.sidebar.selectbox("Delivery Postcode", ["All"] + delivery_options)
 if selected_delivery != "All":
     filters["destination_location_code"] = selected_delivery + "%" # Match the prefix in the whole postcode
 
-# Step 3: Pickup Postcode prefix (dependent on above filters)
-pickup_options = loader.get_unique_prefixes("origin_location_code", filters)
-selected_pickup = st.sidebar.selectbox("Pickup Postcode", ["All"] + pickup_options)
-if selected_pickup != "All":
-    filters["origin_location_code"] = selected_pickup  + "%" # Match the prefix in the whole postcode
 
 # Step 4: Load filtered data
 @st.cache_data
@@ -117,8 +118,8 @@ with st.form("lookup_form"):
     st.markdown("Enter shipment details to estimate median cost over the last 3 months.")
 
     input_vehicle = st.selectbox("Vehicle Type", [""] + loader.get_unique_values("vehicle_type"))
-    input_origin = st.text_input("Origin Prefix (e.g., 'NW1')").upper()
-    input_dest = st.text_input("Destination Prefix (e.g., 'E14')").upper()
+    input_origin = st.text_input("Pickup Prefix (e.g., 'NW1')").upper()
+    input_dest = st.text_input("Delivery Prefix (e.g., 'E14')").upper()
     input_weight = st.number_input("Weight (kg)", min_value=0.0, value=10.0, step=0.5)
 
     # Validation check
@@ -140,7 +141,6 @@ with st.form("lookup_form"):
 
         filters = {
             "vehicle_type": input_vehicle,
-            # We want to match the full postcode against the prefix
             "origin_location_code": f"{input_origin}%",
             "destination_location_code": f"{input_dest}%",
             #"pickup_date": (three_months_ago.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d")),
@@ -154,7 +154,7 @@ with st.form("lookup_form"):
             st.success(f"Estimated median cost for similar shipments (last 3 months): **£{median_price:.2f}**")
             st.dataframe(df_lookup[["pickup_date", "origin_location_code", "destination_location_code", "weight_kg", "cost"]])
         else:
-            st.warning("No similar shipments found for the entered criteria.")
+            st.warning("No similar shipments found for the entered criteria in the last 3 months.")
             new_filters = {
                 "vehicle_type": input_vehicle,
                 # These are the actual column names in the data
