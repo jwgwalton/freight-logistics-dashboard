@@ -95,7 +95,6 @@ def render():
         st.plotly_chart(fig, use_container_width=True)
 
         # -- Heatmap of Costs by Shipper and Carrier --
-        st.subheader("Costs for Carrier and Shipper combinations")
         # Pivot the table to get a heatmap-friendly format
         pivot = df_grouped.pivot(index="shipper_carrier", columns="pickup_year_and_month", values="avg_cost")
         # Create Plotly heatmap
