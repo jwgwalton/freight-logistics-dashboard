@@ -80,7 +80,8 @@ class DataLoader:
             df = self._apply_filters(df, filters, use_front_end_names=False)
 
         prefix_col = f"{column}_prefix"
-        #TODO: Work out why the polars version didn't work
-        pd_df = df.to_pandas()
-        pd_df[prefix_col] = pd_df[FRONT_END_TO_BACKEND_COLUMN_MAPPING[column]].apply(lambda x: x[0:int(prefix_len)])
-        return sorted(pd_df[prefix_col].unique().tolist())
+
+        df = df.with_columns(
+            pl.col(FRONT_END_TO_BACKEND_COLUMN_MAPPING[column]).cast(pl.Utf8).str.slice(0, prefix_len).alias(prefix_col)
+        )
+        return sorted(df.select(pl.col(prefix_col).unique()).to_series().to_list())
