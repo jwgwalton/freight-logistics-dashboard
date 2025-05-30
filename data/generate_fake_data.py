@@ -60,6 +60,8 @@ for _ in range(num_rows):
         # "diff_days_carrier_locked_at_pickup_start_at": diff_days,
         "backend_contract_type": random.choice(["spot", "tender"]),
         "backend_vehicle_type": random.choice(["van", "truck", "mega", "refrigerated"]),
+        "backend_carrier_name": random.choice(["eddie stobart", "Kuehne + Nagel", "shipper"]),
+        "backend_shipper_name": random.choice(["Ikea", "Tesco"]),
         "backend_multistop_count": random.randint(0, 3),
         "backend_is_roundtrip": random.choice([0, 1])
     }

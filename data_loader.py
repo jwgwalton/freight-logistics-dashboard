@@ -1,6 +1,11 @@
 from typing import List, Dict, Any, Optional
+from enum import Enum
 import polars as pl
 import pandas as pd
+
+class FilterType(Enum):
+    DATE = "date"
+    RANGE = "range"
 
 FRONT_END_TO_BACKEND_COLUMN_MAPPING = {
     "origin_location_code": "backend_origin_location_code",
@@ -8,11 +13,13 @@ FRONT_END_TO_BACKEND_COLUMN_MAPPING = {
     "vehicle_type": "backend_vehicle_type",
     "weight_kg": "backend_weight_kg",
     "pickup_date": "backend_pickup_date",
-    "cost": "backend_cost"
+    "contract_type": "backend_contract_type",
+    "cost": "backend_cost",
+    "carrier_name": "backend_carrier_name",
+    "shipper_name": "backend_shipper_name",
 }
 
 BACKEND_TO_FRONT_END_COLUMN_MAPPING = {v: k for k, v in FRONT_END_TO_BACKEND_COLUMN_MAPPING.items()}
-
 
 class DataLoader:
     def __init__(self, source: str = "csv", path: Optional[str] = None, table: Optional[str] = None, conn_str: Optional[str] = None):
@@ -31,15 +38,28 @@ class DataLoader:
         """
         Apply filters to the DataFrame based on the provided filter dictionary.
         The filters can include:
-        - ranges (tuples with two values)
+        - date ranges (tuples with two values)
         - string prefixes (e.g., "prefix%")
         - exact matches (single values)
         """
         for col, val in filters.items():
             col_name = col if use_front_end_names else FRONT_END_TO_BACKEND_COLUMN_MAPPING[col]
 
-            if isinstance(val, tuple) and len(val) == 2:
-                df = df.filter(pl.col(col_name).is_between(val[0], val[1]))
+            if isinstance(val, tuple) and len(val) == 3:
+                if isinstance(val, tuple) and len(val) == 3:
+                    start, end, filter_type = val
+                    if filter_type == FilterType.DATE:
+                        df = df.with_columns(
+                            pl.col(col_name).cast(pl.Date)
+                        )
+                        df = df.filter(
+                            (pl.col(col_name) >= pl.lit(start).str.to_date()) &
+                            (pl.col(col_name) <= pl.lit(end).str.to_date())
+                        )
+                    elif filter_type == FilterType.RANGE:
+                        df = df.filter(pl.col(col_name).is_between(start, end))
+                    else:
+                        raise ValueError(f"Unknown filter type '{filter_type}' for column '{col}'")
             elif isinstance(val, str) and val.endswith('%'):
                 df = df.filter(pl.col(col_name).cast(pl.Utf8).str.starts_with(val[:-1]))
             else:
@@ -74,7 +94,7 @@ class DataLoader:
         df = df.select(final_cols)
 
         # Rename back to frontend names
-        rename_map = {v: k for k, v in FRONT_END_TO_BACKEND_COLUMN_MAPPING.items() if v in df.schema}
+        rename_map = {v: k for k, v in FRONT_END_TO_BACKEND_COLUMN_MAPPING.items() if v in df.collect_schema()}
         df = df.rename(rename_map)
 
         return df.collect().to_pandas()
