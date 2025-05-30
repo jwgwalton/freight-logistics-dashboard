@@ -29,24 +29,24 @@ selected_carrier = st.sidebar.selectbox("Carrier Type", ["All"] + carrier_option
 if selected_carrier != "All":
     filters["vehicle_type"] = selected_carrier
 
-# Step 2: Delivery Country (dependent on carrier type)
-delivery_options = loader.get_unique_values("destination_prefix", filters)
-selected_country = st.sidebar.selectbox("Delivery Postcode", ["All"] + delivery_options)
-if selected_country != "All":
-    filters["destination_prefix"] = selected_country
+# Step 2: Delivery Postcode prefix (dependent on carrier type)
+delivery_options = loader.get_unique_prefixes("destination_location_code", filters)
+selected_delivery = st.sidebar.selectbox("Delivery Postcode", ["All"] + delivery_options)
+if selected_delivery != "All":
+    filters["destination_location_code"] = selected_delivery + "%" # Match the prefix in the whole postcode
 
-# Step 3: Pickup Postcode (dependent on above filters)
-pickup_options = loader.get_unique_values("origin_prefix", filters)
+# Step 3: Pickup Postcode prefix (dependent on above filters)
+pickup_options = loader.get_unique_prefixes("origin_location_code", filters)
 selected_pickup = st.sidebar.selectbox("Pickup Postcode", ["All"] + pickup_options)
 if selected_pickup != "All":
-    filters["origin_prefix"] = selected_pickup
+    filters["origin_location_code"] = selected_pickup  + "%" # Match the prefix in the whole postcode
 
 # Step 4: Load filtered data
 @st.cache_data
 def load_filtered_data(filters):
     required_columns = [
-        "origin_prefix",
-        "destination_prefix",
+        "origin_location_code",
+        "destination_location_code",
         "vehicle_type",
         "weight_kg",
         "pickup_date",
@@ -62,6 +62,8 @@ if not df.empty:
 
     # Weight filter
     min_weight, max_weight = int(df["weight_kg"].min()), int(df["weight_kg"].max())
+    if min_weight == max_weight:
+        max_weight = min_weight + 1  # Ensure the slider has a range
     weight_range = st.sidebar.slider("Weight Range (kg)", min_value=min_weight, max_value=max_weight, value=(min_weight, max_weight))
     df = df[(df["weight_kg"] >= weight_range[0]) & (df["weight_kg"] <= weight_range[1])]
 
