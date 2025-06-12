@@ -3,11 +3,12 @@ import pandas as pd
 
 from data_loader import DataLoader
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 # --- Streamlit Setup ---
-st.set_page_config(page_title="Logistics ML Dashboard", layout="wide")
-st.title("🚞 Logistics Forecast Dashboard")
+st.set_page_config(page_title="Carrier pricing Dashboard", layout="wide")
+st.title("Carrier pricing Dashboard")
 
 # --- Initialize Data Loader ---
 loader = DataLoader(source="csv", path="data/fake_data.csv")
@@ -23,19 +24,22 @@ if st.sidebar.button("🔄 Reset Filters"):
 # --- Dynamic Filtering ---
 filters = {}
 
-# Step 1: Carrier Type
+
+contract_options = loader.get_unique_values("contract_type")
+selected_contract = st.sidebar.selectbox("Contract Type", ["All"] + contract_options)
+if selected_contract != "All":
+    filters["contract_type"] = selected_contract
+
 carrier_options = loader.get_unique_values("vehicle_type")
 selected_carrier = st.sidebar.selectbox("Carrier Type", ["All"] + carrier_options)
 if selected_carrier != "All":
     filters["vehicle_type"] = selected_carrier
 
-# Step 2: Pickup Postcode prefix (dependent on carrier type)
 pickup_options = loader.get_unique_prefixes("origin_location_code", filters)
 selected_pickup = st.sidebar.selectbox("Pickup Postcode", ["All"] + pickup_options)
 if selected_pickup != "All":
     filters["origin_location_code"] = selected_pickup  + "%" # Match the prefix in the whole postcode
 
-# Step 3: Delivery Postcode prefix (dependent on above filters)
 delivery_options = loader.get_unique_prefixes("destination_location_code", filters)
 selected_delivery = st.sidebar.selectbox("Delivery Postcode", ["All"] + delivery_options)
 if selected_delivery != "All":
@@ -46,38 +50,42 @@ if selected_delivery != "All":
 @st.cache_data
 def load_filtered_data(filters):
     required_columns = [
+        "contract_type",
         "origin_location_code",
         "destination_location_code",
         "vehicle_type",
-        "weight_kg",
         "pickup_date",
-        "cost"
+        "cost",
+        "carrier_name",
+        "shipper_name",
     ]
     return loader.load_filtered_data(filters, required_columns)
 
 df = load_filtered_data(filters)
 
-# --- Add extra fields ---
-if not df.empty:
-    df["pickup_date"] = pd.to_datetime(df["pickup_date"], errors='coerce')
 
-    # Weight filter
-    min_weight, max_weight = int(df["weight_kg"].min()), int(df["weight_kg"].max())
-    if min_weight == max_weight:
-        max_weight = min_weight + 1  # Ensure the slider has a range
-    weight_range = st.sidebar.slider("Weight Range (kg)", min_value=min_weight, max_value=max_weight, value=(min_weight, max_weight))
-    df = df[(df["weight_kg"] >= weight_range[0]) & (df["weight_kg"] <= weight_range[1])]
+def estimate_price(df: pd.DataFrame) -> int:
+    """
+    Estimate price based on origin, destination
+    """
+    #TODO: You could implement a more sophisticated estimation here
+    # Remove outliers
+    # Filter for the las
+    median_price = df["cost"].median()
+    return median_price
 
 # --- Display Filtered Data ---
 if not df.empty:
+    price = estimate_price(df)
+    st.success(f"Estimated Price based on selected filters: £{price}")
+
+    df["pickup_date"] = pd.to_datetime(df["pickup_date"], errors='coerce')
+
+
     # --- Summary Table for Last 3 and 12 Months ---
-    st.subheader("📊 Price Summary for Last 3 and 12 Months")
     now = datetime.now()
     last_3m = df[df["pickup_date"] >= now - timedelta(days=90)]
     last_12m = df[df["pickup_date"] >= now - timedelta(days=365)]
-
-    # --- Display DataFrame of results ---
-    # st.write(df)
 
     def summary_stats(data, label):
         return pd.DataFrame({
@@ -92,83 +100,64 @@ if not df.empty:
     summary_3m = summary_stats(last_3m, "Last 3 Months")
     summary_12m = summary_stats(last_12m, "Last 12 Months")
     summary_table = pd.concat([summary_3m, summary_12m], axis=1)
-    st.dataframe(summary_table.style.format("{:.2f}"))
 
-    # --- Visualization: Cost vs Weight using Plotly ---
-    st.subheader("Cost evolution")
+    # ONly show the summary table if there are results in the last 3 or 12 months
+    if not summary_table.isna().all().all():
+        st.subheader("📊 Price Summary for Last 3 and 12 Months")
+        st.dataframe(summary_table.style.format("{:.2f}"))
+
+
+    # -- Cost evolution by Vehicle Type (Scatter plot) --
+    st.subheader("Historical data")
     df["route"] = df["origin_prefix"] + "→" + df["destination_prefix"]
     fig = px.scatter(
-        df,
-        x="pickup_date",
-        y="cost",
-        color="vehicle_type",
-        #TODO: Add other relevant columns to hover_data
-        hover_data=["route"],
+        df, x="pickup_date", y="cost", color="vehicle_type",
+        hover_data=["route", "contract_type"],
         title="Cost evolution by Vehicle Type"
     )
     st.plotly_chart(fig, use_container_width=True)
 
-else:
-    st.warning("No data matches the selected filters.")
 
-st.markdown("---")
-st.subheader("🔍 Forecast Lookup")
+    # -- Cost evolution by Carrier and Shipper (Overlaid line graphs) --
 
-with st.form("lookup_form"):
-    st.markdown("Enter shipment details to estimate median cost over the last 3 months.")
+    st.subheader("Costs variance by Carrier")
+    df["pickup_year_and_month"] = pd.to_datetime(df["pickup_date"]).dt.strftime('%Y-%m')
 
-    input_vehicle = st.selectbox("Vehicle Type", [""] + loader.get_unique_values("vehicle_type"))
-    input_origin = st.text_input("Pickup Prefix (e.g., 'NW1')").upper()
-    input_dest = st.text_input("Delivery Prefix (e.g., 'E14')").upper()
-    input_weight = st.number_input("Weight (kg)", min_value=0.0, value=10.0, step=0.5)
+    df_grouped = df.groupby(["pickup_year_and_month", "carrier_name"]).agg(
+        avg_cost=("cost", "mean")
+    ).reset_index()
 
-    # Validation check
-    all_filled = (
-        input_vehicle != "" and
-        input_origin != "" and
-        input_dest != "" and
-        input_weight > 0
+    fig = px.line(
+        df_grouped, x="pickup_year_and_month", y="avg_cost", color="carrier_name", markers=True,
+        title="Average Cost Over Time by Shipper / Carrier"
+    )
+    fig.update_layout(xaxis_title="Month", yaxis_title="Average Cost", legend_title="Carrier")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # -- Heatmap of Costs by Shipper and Carrier --
+    # Pivot the table to get a heatmap-friendly format
+    pivot = df_grouped.pivot(index="carrier_name", columns="pickup_year_and_month", values="avg_cost")
+    # Create Plotly heatmap
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=pivot.values,
+            x=pivot.columns.tolist(),
+            y=pivot.index.tolist(),
+            colorscale="Viridis",
+            colorbar=dict(title="Avg Cost (£)")
+        )
     )
 
-    submitted = st.form_submit_button("Estimate")#, disabled=not all_filled)
-    if submitted:
-        # --- Apply filters ---
-        # Only look at the last 3 months`
-        now = datetime.now()
-        three_months_ago = now - timedelta(days=90)
-        # Only look at ±10% variance for weight
-        percentage_variance_for_weight = 0.1  # 10% variance
+    fig.update_layout(
+        title="📊 Average Cost Heatmap (Carrier vs Time)",
+        xaxis_title="Month",
+        yaxis_title="Shipper / Carrier",
+        autosize=True,
+        # margin=dict(l=100, r=40, t=60, b=60),
+        # height=min(800, 40 * len(pivot_df))  # Dynamically set height for large Y labels
+    )
 
-        filters = {
-            "vehicle_type": input_vehicle,
-            "origin_location_code": f"{input_origin}%",
-            "destination_location_code": f"{input_dest}%",
-            #"pickup_date": (three_months_ago.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d")),
-            "weight_kg": (input_weight * (1-percentage_variance_for_weight), input_weight * (1+percentage_variance_for_weight)),  # ±10% weight range
-        }
+    st.plotly_chart(fig, use_container_width=True)
 
-        df_lookup = loader.load_filtered_data(filters, required_columns=["pickup_date", "cost"])
-
-        if not df_lookup.empty:
-            median_price = df_lookup["cost"].median()
-            st.success(f"Estimated median cost for similar shipments (last 3 months): **£{median_price:.2f}**")
-            st.dataframe(df_lookup[["pickup_date", "origin_location_code", "destination_location_code", "weight_kg", "cost"]])
-        else:
-            st.warning("No similar shipments found for the entered criteria in the last 3 months.")
-            new_filters = {
-                "vehicle_type": input_vehicle,
-                # These are the actual column names in the data
-                "origin_location_code": f"{input_origin}%",  # match prefix
-                "destination_location_code": f"{input_dest}%",
-                # "pickup_date": (three_months_ago.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d")),
-                # "weight_kg": (input_weight * (1 - percentage_variance_for_weight),
-                #               input_weight * (1 + percentage_variance_for_weight)),  # ±10% weight range
-            }
-            weight_removed_df_lookup = loader.load_filtered_data(new_filters, required_columns=["weight_kg", "origin_location_code", "destination_location_code",  "cost"])
-            if not weight_removed_df_lookup.empty:
-                st.warning("No shipments found with the exact weight, but here are similar shipments:")
-                st.dataframe(weight_removed_df_lookup[["origin_location_code", "destination_location_code", "weight_kg", "cost"]])
-            else:
-                st.error("No shipments found for the search with the weight criteria removed")
-
-
+else:
+    st.warning("No data matches the selected filters.")
